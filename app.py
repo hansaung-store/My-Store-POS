@@ -5,9 +5,14 @@ from google.oauth2.service_account import Credentials
 import os
 import json
 
-# Google Sheets Setup
+# --- Google Sheets Configuration ---
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+
+# GitHub Secrets ထဲက GOOGLE_CREDENTIALS ကို ဖတ်ခြင်း
 creds_json = os.getenv("GOOGLE_CREDENTIALS")
+
+# Sheet ကို ချိတ်ဆက်ရန် Variable ကို ကြိုတင်သတ်မှတ်ခြင်း
+sheet = None
 
 if creds_json:
     try:
@@ -17,20 +22,23 @@ if creds_json:
         
         # လူကြီးမင်း၏ Sheet ID
         SHEET_ID = "156iRKWXZIspmqZSb5TkZV02Z2830q-PNzucbSAKDwhI"
-        sheet = client.open_by_key(SHEET_ID).worksheet("Inventory")
+        # လူကြီးမင်း Google Sheet အောက်ခြေက နာမည် (Sheet1 လို့ပဲ ထားလိုက်ပါတယ်)
+        sheet = client.open_by_key(SHEET_ID).get_worksheet(0) 
     except Exception as e:
-        st.error(f"Error connecting to Google Sheets: {e}")
+        st.error(f"Google Sheet ချိတ်ဆက်မှု အမှားရှိနေပါသည်: {e}")
 else:
-    st.error("GitHub Secrets ထဲမှာ GOOGLE_CREDENTIALS ထည့်ဖို့ လိုအပ်နေပါသေးတယ်!")
+    st.error("GitHub Secrets ထဲမှာ GOOGLE_CREDENTIALS ကို ရှာမတွေ့ပါ။")
 
 def get_data():
-    try:
-        data = sheet.get_all_records()
-        return pd.DataFrame(data)
-    except:
-        return pd.DataFrame()
+    if sheet:
+        try:
+            data = sheet.get_all_records()
+            return pd.DataFrame(data)
+        except:
+            return pd.DataFrame()
+    return pd.DataFrame()
 
-# Streamlit App UI
+# --- Streamlit App UI ---
 st.set_page_config(page_title="My Store POS", layout="wide")
 st.title("🏪 My Store - POS System")
 
@@ -40,16 +48,16 @@ choice = st.sidebar.selectbox("Menu ရွေးချယ်ပါ", menu)
 if choice == "အရောင်းဖွင့်ရန်":
     st.header("🛒 အရောင်းစာမျက်နှာ")
     df = get_data()
-    if not df.empty:
+    if not df.empty and 'Name' in df.columns:
         item_list = df['Name'].tolist()
         selected_item = st.selectbox("ပစ္စည်းရွေးပါ", item_list)
         qty = st.number_input("အရေအတွက်", min_value=1, value=1)
         
         # ဈေးနှုန်းရှာခြင်း
-        price = df[df['Name'] == selected_item]['Price'].values[0]
+        price_val = df[df['Name'] == selected_item]['Price'].values[0]
         
         if st.button("ရောင်းမည်"):
-            total = qty * price
+            total = qty * price_val
             st.success(f"{selected_item} {qty} ခု ရောင်းပြီးပါပြီ။ စုစုပေါင်း: {total} Ks")
     else:
         st.warning("ပစ္စည်းစာရင်း မရှိသေးပါ။ အရင်ဆုံး ပစ္စည်းစာရင်းသွင်းပါ။")
@@ -73,14 +81,17 @@ elif choice == "ပစ္စည်းအသစ်ထည့်ရန်":
         submit_button = st.form_submit_button("စာရင်းသွင်းမည်")
         
         if submit_button:
-            if p_id and p_name:
-                try:
-                    # Google Sheet ထဲသို့ တိုက်ရိုက်သိမ်းခြင်း
-                    sheet.append_row([p_id, p_name, p_price, p_stock])
-                    st.success(f"{p_name} ကို စာရင်းထဲသို့ ထည့်သွင်းပြီးပါပြီ!")
-                except Exception as e:
-                    st.error(f"Error: {e}")
+            if sheet:
+                if p_id and p_name:
+                    try:
+                        sheet.append_row([p_id, p_name, p_price, p_stock])
+                        st.success(f"{p_name} ကို စာရင်းထဲသို့ ထည့်သွင်းပြီးပါပြီ!")
+                    except Exception as e:
+                        st.error(f"Error adding row: {e}")
+                else:
+                    st.warning("ID နှင့် နာမည်ကို ဖြည့်ပေးပါ။")
             else:
-                st.warning("ID နဲ့ နာမည်ကို မဖြစ်မနေ ဖြည့်ပေးပါ။")
+                st.error("Google Sheet နှင့် ချိတ်ဆက်မထားရသေးပါ။")
+
 
 
