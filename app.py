@@ -5,28 +5,34 @@ from google.oauth2.service_account import Credentials
 import os
 import json
 
-# Setup
 st.set_page_config(page_title="My Store POS", layout="wide")
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
-# Connect to Google Sheets
-sheet = None
-creds_json = os.getenv("GOOGLE_CREDENTIALS")
+# Google Sheets Connection Function
+def connect_sheet():
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    creds_json = os.getenv("GOOGLE_CREDENTIALS")
+    
+    if not creds_json:
+        st.error("GitHub Secrets missing!")
+        return None
 
-if creds_json:
     try:
-        creds_dict = json.loads(creds_json)
+        # JSON ထဲက ပြဿနာတက်တတ်တဲ့ စာလုံးတွေကို အလိုအလျောက် ပြင်ပေးခြင်း
+        creds_dict = json.loads(creds_json, strict=False)
+        if "private_key" in creds_dict:
+            creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+            
         creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
         client = gspread.authorize(creds)
         # လူကြီးမင်း၏ Sheet ID
         SHEET_ID = "156iRKWXZIspmqZSb5TkZV02Z2830q-PNzucbSAKDwhI"
-        sheet = client.open_by_key(SHEET_ID).get_worksheet(0)
+        return client.open_by_key(SHEET_ID).get_worksheet(0)
     except Exception as e:
-        st.error(f"Error connecting: {e}")
-else:
-    st.error("GitHub Secrets missing!")
+        st.error(f"Connection Error: {str(e)}")
+        return None
 
-# UI
+sheet = connect_sheet()
+
 st.title("🏪 My Store POS")
 menu = ["ပစ္စည်းကြည့်ရန်", "ပစ္စည်းအသစ်ထည့်ရန်"]
 choice = st.sidebar.selectbox("Menu", menu)
@@ -34,19 +40,20 @@ choice = st.sidebar.selectbox("Menu", menu)
 if choice == "ပစ္စည်းကြည့်ရန်":
     if sheet:
         data = sheet.get_all_records()
-        df = pd.DataFrame(data)
-        st.dataframe(df, use_container_width=True)
+        st.dataframe(pd.DataFrame(data), use_container_width=True)
 
 elif choice == "ပစ္စည်းအသစ်ထည့်ရန်":
     with st.form("add_form", clear_on_submit=True):
-        p_id = st.text_input("ID")
-        p_name = st.text_input("Name")
+        p_id = st.text_input("Product ID")
+        p_name = st.text_input("Item Name")
         p_price = st.number_input("Price", min_value=0)
         p_stock = st.number_input("Stock", min_value=0)
-        if st.form_submit_button("သိမ်းမည်"):
+        
+        if st.form_submit_button("စာရင်းသွင်းမည်"):
             if sheet and p_id and p_name:
                 sheet.append_row([p_id, p_name, p_price, p_stock])
-                st.success("သိမ်းဆည်းပြီးပါပြီ!")
+                st.success("အောင်မြင်စွာ သိမ်းဆည်းပြီးပါပြီ!")
             else:
-                st.error("ဖြည့်စွက်ရန် လိုအပ်နေပါသေးသည်။")
+                st.error("အချက်အလက် ပြည့်စုံစွာ ဖြည့်ပေးပါ!")
+
 
