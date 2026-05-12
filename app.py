@@ -91,7 +91,7 @@ elif choice == "ပစ္စည်းအသစ်ထည့်ရန်":
                 else:
                     st.warning("ID နှင့် နာမည်ကို ဖြည့်ပေးပါ။")
             else:
-                st.error("Google Sheet နှင့် ချိတ်ဆက်မထားရသေးပါ။")
+                st.error("Google Sheet နှင့် ချိတ်ဆက်မ
 
 
 
