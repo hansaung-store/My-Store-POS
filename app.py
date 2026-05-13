@@ -3,18 +3,21 @@ import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 
+# Page Configuration
 st.set_page_config(page_title="My Store POS", layout="wide")
 
 def connect_sheet():
     try:
-        # Secrets ထဲက Key ကို ဒီအတိုင်း ယူမယ်
-        key_content = st.secrets["PRIVATE_KEY"]
-        
+        # Secrets ထဲက PRIVATE_KEY ကို ဆွဲယူမယ်
+        # \n တွေကို စာကြောင်းအသစ်အဖြစ် ပြန်ပြောင်းပေးဖို့ replace ကို သုံးထားပါတယ်
+        raw_key = st.secrets["PRIVATE_KEY"]
+        private_key = raw_key.replace("\\n", "\n")
+
         creds_info = {
             "type": "service_account",
             "project_id": "my-store-pos-496112",
             "private_key_id": "97d4a09955630e08ec946cdab8d914aa9e538de1",
-            "private_key": key_content,
+            "private_key": private_key,
             "client_email": "mystore-manager@my-store-pos-496112.iam.gserviceaccount.com",
             "client_id": "113930516733930481428",
             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
@@ -26,11 +29,15 @@ def connect_sheet():
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         creds = Credentials.from_service_account_info(creds_info, scopes=scope)
         client = gspread.authorize(creds)
+        
+        # Google Sheet ID နဲ့ ချိတ်ဆက်မယ်
         return client.open_by_key("156iRKWXZIspmqZSb5TkZV02Z2830q-PNzucbSAKDwhI").get_worksheet(0)
+    
     except Exception as e:
         st.error(f"Sheet ချိတ်ဆက်မှု အမှား: {e}")
         return None
 
+# App UI
 st.title("🏪 My Store POS")
 sheet = connect_sheet()
 
@@ -40,8 +47,14 @@ if sheet:
 
     if choice == "ပစ္စည်းကြည့်ရန်":
         st.subheader("📦 လက်ရှိပစ္စည်းစာရင်း")
-        data = sheet.get_all_records()
-        st.dataframe(pd.DataFrame(data), use_container_width=True)
+        try:
+            data = sheet.get_all_records()
+            if data:
+                st.dataframe(pd.DataFrame(data), use_container_width=True)
+            else:
+                st.info("စာရင်းထဲမှာ ဘာမှမရှိသေးပါဘူး။")
+        except Exception as e:
+            st.error(f"ဒေတာဖတ်ရာတွင် အမှားရှိပါသည်: {e}")
 
     elif choice == "ပစ္စည်းအသစ်ထည့်ရန်":
         st.subheader("➕ ပစ္စည်းအသစ်ထည့်ရန်")
@@ -50,6 +63,10 @@ if sheet:
             p_name = st.text_input("Item Name")
             p_price = st.number_input("Price", min_value=0)
             p_stock = st.number_input("Stock", min_value=0)
+            
             if st.form_submit_button("သိမ်းဆည်းမည်"):
-                sheet.append_row([p_id, p_name, p_price, p_stock])
-                st.success("အောင်မြင်စွာစာရင်းသွင်းပြီးပါပြီ!")
+                if p_id and p_name:
+                    sheet.append_row([p_id, p_name, p_price, p_stock])
+                    st.success("အောင်မြင်စွာစာရင်းသွင်းပြီးပါပြီ!")
+                else:
+                    st.warning("Product ID နဲ့ နာမည်ကို ဖြည့်ပေးပါ။")
